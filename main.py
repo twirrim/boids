@@ -1,3 +1,5 @@
+"""Simulation of Boids, written in python, and leveraging PyGame."""
+
 import math
 import random
 import sys
@@ -8,15 +10,18 @@ import pygame
 
 @dataclass
 class Boid:
+    """Representation of a boid."""
+
     x: float
     y: float
     xv: float
     yv: float
+    current_speed: float = 0.0
 
 
 # Set up our constants
 FPS = 60
-BOID_COUNT = 250
+BOID_COUNT = 1000
 AVOID_FACTOR = 0.05  # Value TBD
 MATCHING_FACTOR = 0.05  # Value TBD
 CENTERING_FACTOR = 0.0005  # Value TBD
@@ -29,11 +34,29 @@ PROTECTED_RANGE = 2
 PROTECTED_RANGE_SQUARED = PROTECTED_RANGE * PROTECTED_RANGE
 MARGIN = 10  # Value TBD
 
-# Colors (RGB tuples)
+# Colours (RGB tuples)
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 
-def update_boids(boids: list[Boid]):
+
+def get_colour_by_speed(speed: float) -> tuple[int, int, int]:
+    """
+    Calculates a colour based on speed,
+    transitioning from red (slow) to blue (fast).
+    """
+
+    normalized_speed = (speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED)
+    t = max(0.0, min(1.0, normalized_speed))  # Clamp t to [0, 1]
+
+    red_val = int(255 * (1 - t))
+    blue_val = int(255 * t)
+
+    return (red_val, 0, blue_val)
+
+
+def update_boids(boids: list[Boid]) -> None:
+    """Update the location and velocity of every boid."""
+
     for bidx, boid in enumerate(boids):
         xpos_avg: float = 0.0
         ypos_avg: float = 0.0
@@ -95,13 +118,18 @@ def update_boids(boids: list[Boid]):
                 factor = MIN_SPEED / speed
                 boid.xv *= factor
                 boid.yv *= factor
+                boid.current_speed = MIN_SPEED
             elif speed > MAX_SPEED:
                 factor = MAX_SPEED / speed
                 boid.xv *= factor
                 boid.yv *= factor
+                boid.current_speed = MAX_SPEED
+            else:
+                boid.current_speed = speed
         elif MIN_SPEED > 0:  # If speed is 0 give it a nudge
             boid.xv = random.uniform(-MIN_SPEED, MIN_SPEED)
             boid.yv = random.uniform(-MIN_SPEED, MIN_SPEED)
+            boid.current_speed = MIN_SPEED
 
         # Update boid's position
         boid.x = boid.x + boid.xv
@@ -116,16 +144,17 @@ clock = pygame.time.Clock()
 
 # Create our initial BOIDS
 random.seed()
-boids: list[Boid] = []
-for _ in range(BOID_COUNT):
-    boids.append(
-        Boid(
-            random.uniform(0.0, float(screen.get_width() - MARGIN)),
-            random.uniform(0.0, float(screen.get_height() - MARGIN)),
-            random.uniform(-MAX_SPEED/2.0, MAX_SPEED/2.0),
-            random.uniform(-MAX_SPEED/2.0, MAX_SPEED/2.0),
-        )
+
+boids: list[Boid] = [
+    Boid(
+        random.uniform(0.0, float(screen.get_width() - MARGIN)),
+        random.uniform(0.0, float(screen.get_height() - MARGIN)),
+        random.uniform(-MAX_SPEED / 2.0, MAX_SPEED / 2.0),
+        random.uniform(-MAX_SPEED / 2.0, MAX_SPEED / 2.0),
     )
+    for _ in range(BOID_COUNT)
+]
+
 
 # main loop
 running = True
@@ -133,17 +162,18 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                running = False
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            running = False
 
     screen.fill(BLACK)  # Clear the screen / set background
     update_boids(boids)
 
     for boid in boids:
+        # Figure out the colour
+        colour = get_colour_by_speed(boid.current_speed)
         # Draw the boids
-        pygame.draw.circle(screen, WHITE, (int(boid.x), int(boid.y)), 2)
-        
+        pygame.draw.circle(screen, colour, (int(boid.x), int(boid.y)), 2)
+
     pygame.display.flip()  # Updates the entire screen
 
     clock.tick(FPS)
