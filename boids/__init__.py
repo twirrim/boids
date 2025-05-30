@@ -80,11 +80,12 @@ def update_boids(boids: list[Boid], height, width, margin, min_speed, max_speed)
                             continue
                         dx = boid.x - otherboid.x
                         dy = boid.y - otherboid.y
+
                         if abs(dx) < VISIBLE_RANGE and abs(dy) < VISIBLE_RANGE:
                             squared_distance = dx * dx + dy * dy
                             if squared_distance < PROTECTED_RANGE_SQUARED:
-                                close_dx += boid.x - otherboid.x
-                                close_dy += boid.y - otherboid.y
+                                close_dx += dx
+                                close_dy += dy
                             elif squared_distance < VISIBLE_RANGE_SQUARED:
                                 xpos_avg += otherboid.x
                                 ypos_avg += otherboid.y
@@ -97,19 +98,14 @@ def update_boids(boids: list[Boid], height, width, margin, min_speed, max_speed)
             xvel_avg = xvel_avg / neighboring_boids
             yvel_avg = yvel_avg / neighboring_boids
 
-            boid.xv = (
-                boid.xv
-                + (xpos_avg - boid.x) * CENTERING_FACTOR
-                + (xvel_avg - boid.xv) * MATCHING_FACTOR
-            )
+            boid.xv += (xpos_avg - boid.x) * CENTERING_FACTOR + \
+                       (xvel_avg - boid.xv) * MATCHING_FACTOR
 
-            boid.yv = (
-                boid.yv
-                + (ypos_avg - boid.y) * CENTERING_FACTOR
-                + (yvel_avg - boid.yv) * MATCHING_FACTOR
-            )
-        boid.xv = boid.xv + (close_dx * AVOID_FACTOR)
-        boid.yv = boid.yv + (close_dy * AVOID_FACTOR)
+            boid.yv += (ypos_avg - boid.y) * CENTERING_FACTOR + \
+                       (yvel_avg - boid.yv) * MATCHING_FACTOR
+
+        boid.xv += close_dx * AVOID_FACTOR
+        boid.yv += close_dy * AVOID_FACTOR
 
         # Keep them in the screen
         if boid.y > height - margin:
