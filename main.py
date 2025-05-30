@@ -1,27 +1,19 @@
 """Simulation of Boids, written in python, and leveraging PyGame."""
 
+import argparse
 import math
+import os
 import random
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 import pygame
-
-
-@dataclass
-class Boid:
-    """Representation of a boid."""
-
-    x: float
-    y: float
-    xv: float
-    yv: float
-    current_speed: float = 0.0
-
+from tqdm import tqdm
 
 # Set up our constants
 FPS = 60
-BOID_COUNT = 1000
+BOID_COUNT = 750
 AVOID_FACTOR = 0.05  # Value TBD
 MATCHING_FACTOR = 0.05  # Value TBD
 CENTERING_FACTOR = 0.0005  # Value TBD
@@ -39,14 +31,41 @@ BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 
 
+@dataclass
+class Boid:
+    """Representation of a boid."""
+
+    x: float
+    y: float
+    xv: float
+    yv: float
+    current_speed: float = 0.0
+
+
+def present_directory(fpath: str):
+    """For use with argparse, makes sure argument is for a valid directory"""
+    source = Path(fpath)
+    if not source.is_dir():
+        raise argparse.ArgumentTypeError("Invalid directory {}".format(fpath))
+    return source
+
+
+def parse_args():
+    args = argparse.ArgumentParser()
+    args.add_argument("--video", action="store_true")
+    args.add_argument("--dir", type=present_directory)
+    args.add_argument("--frames", type=int)
+    return args.parse_args()
+
+
 def get_colour_by_speed(speed: float) -> tuple[int, int, int]:
     """
     Calculates a colour based on speed,
     transitioning from red (slow) to blue (fast).
     """
 
-    normalized_speed = (speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED)
-    t = max(0.0, min(1.0, normalized_speed))  # Clamp t to [0, 1]
+    normalised_speed = (speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED)
+    t = max(0.0, min(1.0, normalised_speed))  # Clamp t to [0, 1]
 
     red_val = int(255 * (1 - t))
     blue_val = int(255 * t)
@@ -54,7 +73,7 @@ def get_colour_by_speed(speed: float) -> tuple[int, int, int]:
     return (red_val, 0, blue_val)
 
 
-def update_boids(boids: list[Boid]) -> None:
+def update_boids(boids: list[Boid], height, width) -> None:
     """Update the location and velocity of every boid."""
 
     for bidx, boid in enumerate(boids):
@@ -102,9 +121,9 @@ def update_boids(boids: list[Boid]) -> None:
         boid.yv = boid.yv + (close_dy * AVOID_FACTOR)
 
         # Keep them in the screen
-        if boid.y > screen.get_height() - MARGIN:
+        if boid.y > height - MARGIN:
             boid.yv = boid.yv - TURN_FACTOR
-        if boid.x > screen.get_width() - MARGIN:
+        if boid.x > width - MARGIN:
             boid.xv = boid.xv - TURN_FACTOR
         if boid.x < MARGIN:
             boid.xv = boid.xv + TURN_FACTOR
@@ -136,47 +155,70 @@ def update_boids(boids: list[Boid]) -> None:
         boid.y = boid.y + boid.yv
 
 
-# Set up pygame
-pygame.init()
-screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-pygame.display.set_caption("Boidy")
-clock = pygame.time.Clock()
+def main() -> None:
+    # Get arguments and carry out some validation
+    args = parse_args()
+    if args.video and not (args.frames and args.dir):
+        print("You must provide --frames and --dir with --video")
+        sys.exit(1)
 
-# Create our initial BOIDS
-random.seed()
+    # Set up pygame
+    pygame.init()
+    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+    pygame.display.set_caption("Boidy")
+    clock = pygame.time.Clock()
+    height = screen.get_height()
+    width = screen.get_width()
 
-boids: list[Boid] = [
-    Boid(
-        random.uniform(0.0, float(screen.get_width() - MARGIN)),
-        random.uniform(0.0, float(screen.get_height() - MARGIN)),
-        random.uniform(-MAX_SPEED / 2.0, MAX_SPEED / 2.0),
-        random.uniform(-MAX_SPEED / 2.0, MAX_SPEED / 2.0),
-    )
-    for _ in range(BOID_COUNT)
-]
+    # Create our initial BOIDS
+    random.seed()
+
+    boids: list[Boid] = [
+        Boid(
+            random.uniform(MARGIN, width - MARGIN),
+            random.uniform(MARGIN, height - MARGIN),
+            random.uniform(-MAX_SPEED / 2.0, MAX_SPEED / 2.0),
+            random.uniform(-MAX_SPEED / 2.0, MAX_SPEED / 2.0),
+        )
+        for _ in range(BOID_COUNT)
+    ]
+
+    # main loop
+    running = True
+    if args.video:
+        pbar = tqdm(total=args.frames)
+    frame_count = 0
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                running = False
+
+        screen.fill(BLACK)  # Clear the screen / set background
+        update_boids(boids, height, width)
+
+        for boid in boids:
+            # Figure out the colour
+            colour = get_colour_by_speed(boid.current_speed)
+            # Draw the boids
+            pygame.draw.circle(screen, colour, (int(boid.x), int(boid.y)), 2)
+
+        pygame.display.flip()  # Updates the entire screen
+
+        if args.video:
+            pbar.update(1)
+            frame_count += 1
+            filename = os.path.join(args.dir, f"frame_{frame_count:05d}.png")
+            pygame.image.save(screen, filename)
+            if frame_count > args.frames:
+                running = False
+        else:
+            clock.tick(FPS)
+
+    pygame.quit()
+    sys.exit()
 
 
-# main loop
-running = True
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            running = False
-
-    screen.fill(BLACK)  # Clear the screen / set background
-    update_boids(boids)
-
-    for boid in boids:
-        # Figure out the colour
-        colour = get_colour_by_speed(boid.current_speed)
-        # Draw the boids
-        pygame.draw.circle(screen, colour, (int(boid.x), int(boid.y)), 2)
-
-    pygame.display.flip()  # Updates the entire screen
-
-    clock.tick(FPS)
-
-pygame.quit()
-sys.exit()
+if __name__ == "__main__":
+    main()
