@@ -1,6 +1,7 @@
 import math
 import random
 from dataclasses import dataclass
+from collections import defaultdict
 
 VISIBLE_RANGE = 20.0  # Value TBD
 VISIBLE_RANGE_SQUARED = VISIBLE_RANGE * VISIBLE_RANGE
@@ -10,6 +11,10 @@ AVOID_FACTOR = 0.05  # Value TBD
 MATCHING_FACTOR = 0.05  # Value TBD
 CENTERING_FACTOR = 0.0005  # Value TBD
 TURN_FACTOR = 0.2  # Value TBD
+
+# To make update_boids more efficient, we'll break things up into cells
+CELL_SIZE = VISIBLE_RANGE * 1.1
+
 
 @dataclass
 class Boid:
@@ -35,11 +40,23 @@ def get_colour_by_speed(speed: float, min_speed: float, max_speed: float) -> tup
 
     return (red_val, 0, blue_val)
 
+def populate_grid(boids: list[Boid], cell_s: float) -> defaultdict[tuple[int,int], list[Boid]]:
+    grid_dict = defaultdict(list)
+    for boid in boids:
+        # Determine which cell the boid belongs to.
+        # I think I need floor division here
+        cell_x = int(boid.x // cell_s)
+        cell_y = int(boid.y // cell_s)
+
+        grid_dict[(cell_x, cell_y)].append(boid)
+    return grid_dict
 
 def update_boids(boids: list[Boid], height, width, margin, min_speed, max_speed) -> None:
     """Update the location and velocity of every boid."""
 
-    for bidx, boid in enumerate(boids):
+    grid: defaultdict[tuple[int, int], list[Boid]] = populate_grid(boids, CELL_SIZE)
+
+    for boid in boids:
         xpos_avg: float = 0.0
         ypos_avg: float = 0.0
         xvel_avg: float = 0.0
@@ -47,22 +64,33 @@ def update_boids(boids: list[Boid], height, width, margin, min_speed, max_speed)
         neighboring_boids: int = 0
         close_dx: float = 0.0
         close_dy: float = 0.0
-        for cidx, otherboid in enumerate(boids):
-            if cidx == bidx:
-                continue
-            dx = boid.x - otherboid.x
-            dy = boid.y - otherboid.y
-            if abs(dx) < VISIBLE_RANGE and abs(dy) < VISIBLE_RANGE:
-                squared_distance = dx * dx + dy * dy
-                if squared_distance < PROTECTED_RANGE_SQUARED:
-                    close_dx += boid.x - otherboid.x
-                    close_dy += boid.y - otherboid.y
-                elif squared_distance < VISIBLE_RANGE_SQUARED:
-                    xpos_avg += otherboid.x
-                    ypos_avg += otherboid.y
-                    xvel_avg += otherboid.xv
-                    yvel_avg += otherboid.yv
-                    neighboring_boids += 1
+
+        # find out our what cell we're in
+        boid_cell_x = int(boid.x // CELL_SIZE)
+        boid_cell_y = int(boid.y // CELL_SIZE)
+
+        for cell_x_offset in range(-1, 2):
+            for cell_y_offset in range(-1, 2):
+                check_cell_x = boid_cell_x + cell_x_offset
+                check_cell_y = boid_cell_y + cell_y_offset
+                # check if it is in the grid (also eliminates cases where we'd go out of bounds)
+                if (check_cell_x, check_cell_y) in grid:
+                    for otherboid in grid[(check_cell_x, check_cell_y)]:
+                        if otherboid is boid:
+                            continue
+                        dx = boid.x - otherboid.x
+                        dy = boid.y - otherboid.y
+                        if abs(dx) < VISIBLE_RANGE and abs(dy) < VISIBLE_RANGE:
+                            squared_distance = dx * dx + dy * dy
+                            if squared_distance < PROTECTED_RANGE_SQUARED:
+                                close_dx += boid.x - otherboid.x
+                                close_dy += boid.y - otherboid.y
+                            elif squared_distance < VISIBLE_RANGE_SQUARED:
+                                xpos_avg += otherboid.x
+                                ypos_avg += otherboid.y
+                                xvel_avg += otherboid.xv
+                                yvel_avg += otherboid.yv
+                                neighboring_boids += 1
         if neighboring_boids:
             xpos_avg = xpos_avg / neighboring_boids
             ypos_avg = ypos_avg / neighboring_boids
