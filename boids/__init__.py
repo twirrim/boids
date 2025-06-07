@@ -1,6 +1,8 @@
 import math
+from colorsys import hls_to_rgb
 from dataclasses import dataclass
 from collections import defaultdict
+from typing import Tuple
 
 
 @dataclass
@@ -13,6 +15,9 @@ class Boid:
     xv: float
     yv: float
     current_speed: float = 0.0
+    colour: Tuple[int, int, int] = (0, 0, 0)
+    predator: bool = False
+    alive: bool = True
 
 
 def get_colour_by_speed(
@@ -30,6 +35,17 @@ def get_colour_by_speed(
     blue_val = int(255 * t)
 
     return (red_val, 0, blue_val)
+
+
+def get_color_for_x(x, width):
+    """
+    Calculates a vibrant RGB color based on a horizontal position.
+    """
+    hue = x / width
+    lightness = 0.5
+    saturation = 1.0
+    r, g, b = hls_to_rgb(hue, lightness, saturation)
+    return (int(r * 255), int(g * 255), int(b * 255))
 
 
 def populate_grid(

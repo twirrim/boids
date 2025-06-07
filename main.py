@@ -10,7 +10,7 @@ from pathlib import Path
 import pygame
 from tqdm import tqdm
 
-from boids import Boid, update_boids, get_colour_by_speed
+from boids import Boid, update_boids, get_color_for_x
 
 
 # Set up our constants
@@ -18,7 +18,7 @@ FPS = 60
 MAX_SPEED = 3.0  # Value TBD
 MIN_SPEED = 0.5  # Value TBD
 MARGIN = 10  # Value TBD
-VISIBLE_RANGE = 20.0  # Value TBD
+VISIBLE_RANGE = 40.0  # Value TBD
 VISIBLE_RANGE_SQUARED = VISIBLE_RANGE * VISIBLE_RANGE
 PROTECTED_RANGE = 2  # Value TBD
 PROTECTED_RANGE_SQUARED = PROTECTED_RANGE * PROTECTED_RANGE
@@ -70,25 +70,34 @@ def main() -> None:
 
     # Set up pygame
     pygame.init()
-    screen = pygame.display.set_mode((3280, 2160))
+    flags = pygame.DOUBLEBUF | pygame.FULLSCREEN | pygame.HWSURFACE
+    # screen = pygame.display.set_mode((3280, 2160))
+    screen = pygame.display.set_mode((3280, 2160), flags=flags)
+    hardware_surface = pygame.Surface((screen.get_width(), screen.get_height()), flags)
+    screen.blit(hardware_surface, (0, 0))
     pygame.display.set_caption("Boidy")
     clock = pygame.time.Clock()
     height = screen.get_height()
     width = screen.get_width()
 
     # Create our initial BOIDS
-    random.seed()
+    random.seed(0)
 
-    boids: list[Boid] = [
-        Boid(
-            idx,
-            random.uniform(MARGIN, width - MARGIN),
-            random.uniform(MARGIN, height - MARGIN),
-            random.uniform(-MAX_SPEED / 2.0, MAX_SPEED / 2.0),
-            random.uniform(-MAX_SPEED / 2.0, MAX_SPEED / 2.0),
+    boids: list[Boid] = []
+    for idx in range(args.boids):
+        x = random.uniform(MARGIN, width - MARGIN)
+        boids.append(
+            Boid(
+                idx,
+                x,
+                random.uniform(MARGIN, height - MARGIN),
+                random.uniform(-MAX_SPEED / 2.0, MAX_SPEED / 2.0),
+                random.uniform(-MAX_SPEED / 2.0, MAX_SPEED / 2.0),
+                colour=get_color_for_x(x, width),
+                predator=False,
+                alive=True,
+            )
         )
-        for idx in range(args.boids)
-    ]
 
     # main loop
     running = True
@@ -102,7 +111,7 @@ def main() -> None:
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 running = False
 
-        screen.fill(BLACK)  # Clear the screen / set background
+        hardware_surface.fill(BLACK)  # Clear the screen / set background
         update_boids(
             boids,
             height,
@@ -119,11 +128,11 @@ def main() -> None:
         )
 
         for boid in boids:
-            # Figure out the colour
-            colour = get_colour_by_speed(boid.current_speed, MIN_SPEED, MAX_SPEED)
             # Draw the boids
-            pygame.draw.circle(screen, colour, (int(boid.x), int(boid.y)), 2)
-
+            pygame.draw.circle(
+                hardware_surface, boid.colour, (int(boid.x), int(boid.y)), 2
+            )
+        screen.blit(hardware_surface, (0, 0))
         pygame.display.flip()  # Updates the entire screen
 
         if args.frames:
