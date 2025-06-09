@@ -47,10 +47,13 @@ def parse_args():
     args.add_argument(
         "--boids", required=True, type=int, help="Number of boids to simulate"
     )
-    args.add_argument("--video", action="store_true")
-    args.add_argument("--dir", type=present_directory)
-    args.add_argument("--frames", type=int)
-    args.add_argument("--profile", action="store_true")
+    args.add_argument("--video", help="Should render to disk", action="store_true")
+    args.add_argument(
+        "--dir", help="Directory to write frames to", type=present_directory
+    )
+    args.add_argument("--frames", help="Number of frames to generate", type=int)
+    args.add_argument("--profile", help="Run under cProfile", action="store_true")
+    args.add_argument("--predators", help="Number of predators", type=int, default=0)
     return args.parse_args()
 
 
@@ -85,16 +88,21 @@ def main() -> None:
 
     boids: list[Boid] = []
     for idx in range(args.boids):
-        x = random.uniform(MARGIN, width - MARGIN)
+        position = pygame.math.Vector2(
+            random.uniform(MARGIN, width - MARGIN),
+            random.uniform(MARGIN, height - MARGIN),
+        )
+        predator = True if idx < args.predators else False
         boids.append(
             Boid(
-                idx,
-                x,
-                random.uniform(MARGIN, height - MARGIN),
-                random.uniform(-MAX_SPEED / 2.0, MAX_SPEED / 2.0),
-                random.uniform(-MAX_SPEED / 2.0, MAX_SPEED / 2.0),
-                colour=get_color_for_x(x, width),
-                predator=False,
+                idx=idx,
+                position=position,
+                velocity=pygame.math.Vector2(
+                    random.uniform(-MAX_SPEED / 2.0, MAX_SPEED / 2.0),
+                    random.uniform(-MAX_SPEED / 2.0, MAX_SPEED / 2.0),
+                ),
+                colour=get_color_for_x(position.x, width),
+                predator=predator,
                 alive=True,
             )
         )
@@ -129,8 +137,12 @@ def main() -> None:
 
         for boid in boids:
             # Draw the boids
+            size = 100 if boid.predator else 2
             pygame.draw.circle(
-                hardware_surface, boid.colour, (int(boid.x), int(boid.y)), 2
+                hardware_surface,
+                boid.colour,
+                (int(boid.position.x), int(boid.position.y)),
+                size,
             )
         screen.blit(hardware_surface, (0, 0))
         pygame.display.flip()  # Updates the entire screen
