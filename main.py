@@ -6,12 +6,10 @@ import random
 import sys
 from pathlib import Path
 
-
 import pygame
 from tqdm import tqdm
 
-from boids import Boid, update_boids, get_color_for_x
-
+from boids import Boid, get_color_for_x, update_boids
 
 # Set up our constants
 FPS = 60
@@ -93,6 +91,7 @@ def main() -> None:
             random.uniform(MARGIN, height - MARGIN),
         )
         predator = True if idx < args.predators else False
+        colour = (255, 255, 255) if predator else get_color_for_x(position.x, width)
         boids.append(
             Boid(
                 idx=idx,
@@ -101,7 +100,7 @@ def main() -> None:
                     random.uniform(-MAX_SPEED / 2.0, MAX_SPEED / 2.0),
                     random.uniform(-MAX_SPEED / 2.0, MAX_SPEED / 2.0),
                 ),
-                colour=get_color_for_x(position.x, width),
+                colour=colour,
                 predator=predator,
                 alive=True,
             )
@@ -137,7 +136,7 @@ def main() -> None:
 
         for boid in boids:
             # Draw the boids
-            size = 100 if boid.predator else 2
+            size = 10 if boid.predator else 2
             pygame.draw.circle(
                 hardware_surface,
                 boid.colour,
